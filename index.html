@@ -67,7 +67,7 @@
   </defs>
 </svg>
 
-<svg id="mapa"><defs id="defs"></defs><g id="mundo"><g id="capaT"></g><g id="capaN"></g></g></svg>
+<svg id="mapa"><defs id="defs"></defs><g id="mundo"><g id="capaT"></g><g id="capaN"></g><g id="capaL"></g></g></svg>
 
 <div id="barra">
   <h1 id="titulo">Mi Juego BJJ</h1>
@@ -89,7 +89,7 @@
 <input type="file" id="foto" accept="image/*" hidden>
 <div id="hoja"></div>
 <div id="lista"></div>
-<div id="ayuda">Tocá una posición · arrastrá para mover · pellizcá para zoom</div>
+<div id="ayuda">Tocá una posición · arrastrá posiciones o nombres de técnicas · pellizcá para zoom</div>
 <div id="toast"></div>
 
 <script src="icons.js"></script>
@@ -171,16 +171,26 @@ function curva(t, idx, total) {
   const A = nodo(t.de), B = nodo(t.a);
   if (!A || !B) return null;
   if (A === B) { // técnica que vuelve a la misma posición
-    const p = `M${A.x - 14} ${A.y - R + 2} C${A.x - 70} ${A.y - 120}, ${A.x + 70} ${A.y - 120}, ${A.x + 14} ${A.y - R + 2}`;
-    return { d: p, lx: A.x, ly: A.y - 100 };
+    // etiqueta movida: corro los puntos de control para que la curva pase por ella
+    const ox = (t.lu ?? 0) / .75, oy = (t.lv ?? 0) / .75;
+    const p = `M${A.x - 14} ${A.y - R + 2} C${A.x - 70 + ox} ${A.y - 120 + oy}, ${A.x + 70 + ox} ${A.y - 120 + oy}, ${A.x + 14} ${A.y - R + 2}`;
+    return { d: p, lx: A.x + (t.lu ?? 0), ly: A.y - 100 + (t.lv ?? 0) };
   }
   const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
-  const off = 22 + (idx - (total - 1) / 2) * 34;
-  const cx = (A.x + B.x) / 2 - dy / L * off, cy = (A.y + B.y) / 2 + dx / L * off;
+  const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+  let cx, cy;
+  if (t.lu != null) { // etiqueta movida (guardada relativa a la línea A→B): la curva pasa por la etiqueta
+    const lx = mx + dx * t.lu - dy / L * t.lv, ly = my + dy * t.lu + dx / L * t.lv;
+    cx = 2 * lx - mx; cy = 2 * ly - my;
+  } else {
+    const off = 22 + (idx - (total - 1) / 2) * 34;
+    cx = mx - dy / L * off; cy = my + dx / L * off;
+  }
   const ajus = (P, Q, r) => { const vx = Q.x - P.x, vy = Q.y - P.y, l = Math.hypot(vx, vy) || 1; return { x: P.x + vx / l * r, y: P.y + vy / l * r }; };
   const s = ajus(A, { x: cx, y: cy }, R + 2), e = ajus(B, { x: cx, y: cy }, R + 13);
   return { d: `M${s.x} ${s.y} Q${cx} ${cy} ${e.x} ${e.y}`, lx: .25 * A.x + .5 * cx + .25 * B.x, ly: .25 * A.y + .5 * cy + .25 * B.y };
 }
+const posL = {}; // dónde quedó cada etiqueta de técnica en el último dibujo
 function dibujar() {
   $('#titulo').textContent = D.nombre ? `Juego de ${D.nombre}` : 'Mi Juego BJJ';
   $('#defs').innerHTML = `<clipPath id="clipN" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>` +
@@ -197,10 +207,12 @@ function dibujar() {
     htmlT += `<g data-t="${t.id}" opacity="${dim}"><path d="${c.d}" stroke="transparent" stroke-width="22" fill="none"/>` +
       `<path d="${c.d}" stroke="${tp.c}" stroke-opacity="${op}" stroke-width="${sel && sel.t === t.id ? w + 2 : w}" fill="none" stroke-linecap="round" marker-end="url(#m_${t.tipo in TIPOS ? t.tipo : 'transicion'})"/></g>`;
     const txt = `${t.nombre} · ${t.prob ?? 50}%`, ancho = txt.length * 6.4 + 12;
-    htmlL += `<g data-t="${t.id}" opacity="${dim}"><rect x="${c.lx - ancho / 2}" y="${c.ly - 10}" width="${ancho}" height="20" rx="10" fill="#0E1014" stroke="${tp.c}" stroke-opacity=".6"/>` +
+    posL[t.id] = { x: c.lx, y: c.ly };
+    htmlL += `<g data-t="${t.id}" data-l="1" opacity="${dim}" style="cursor:move"><rect x="${c.lx - ancho / 2}" y="${c.ly - 10}" width="${ancho}" height="20" rx="10" fill="#0E1014" stroke="${tp.c}" stroke-opacity=".6"/>` +
       `<text x="${c.lx}" y="${c.ly + 4}" text-anchor="middle" font-size="11.5" fill="#e8ecf2">${esc(txt)}</text></g>`;
   }));
-  $('#capaT').innerHTML = htmlT + htmlL;
+  $('#capaT').innerHTML = htmlT;
+  $('#capaL').innerHTML = htmlL;
   $('#capaN').innerHTML = D.nodos.map(n => {
     const elegido = sel && sel.n === n.id;
     const vecino = sel && sel.n && D.tecnicas.some(t => (t.de === sel.n && t.a === n.id) || (t.a === sel.n && t.de === n.id));
@@ -240,6 +252,7 @@ svg.addEventListener('pointerdown', e => {
   const gN = e.target.closest('[data-n]'), gT = e.target.closest('[data-t]');
   gesto = { tipo: gN ? 'nodo' : 'pan', id: gN?.dataset.n, tid: gT?.dataset.t, x0: e.clientX, y0: e.clientY, v0: { ...vista }, movio: false };
   if (gN) { const n = nodo(gN.dataset.n); gesto.nx = n.x; gesto.ny = n.y; }
+  else if (e.target.closest('[data-l]') && posL[gesto.tid]) { gesto.tipo = 'etiqueta'; gesto.l0 = { ...posL[gesto.tid] }; }
 });
 svg.addEventListener('pointermove', e => {
   if (!punteros.has(e.pointerId)) return;
@@ -257,13 +270,25 @@ svg.addEventListener('pointermove', e => {
   if (!gesto.movio && Math.hypot(dx, dy) < 7) return;
   gesto.movio = true;
   if (gesto.tipo === 'nodo') { const n = nodo(gesto.id); n.x = Math.round(gesto.nx + dx / vista.k); n.y = Math.round(gesto.ny + dy / vista.k); dibujar(); }
+  else if (gesto.tipo === 'etiqueta') moverEtiqueta(gesto.tid, gesto.l0.x + dx / vista.k, gesto.l0.y + dy / vista.k);
   else if (gesto.tipo === 'pan') { vista.x = gesto.v0.x + dx; vista.y = gesto.v0.y + dy; aplicarVista(); }
 });
+function moverEtiqueta(id, x, y) {
+  const t = D.tecnicas.find(t => t.id === id), A = nodo(t?.de), B = nodo(t?.a);
+  if (!A || !B) return;
+  if (A === B) { t.lu = Math.round(x - A.x); t.lv = Math.round(y - (A.y - 100)); }
+  else {
+    const dx = B.x - A.x, dy = B.y - A.y, L2 = dx * dx + dy * dy || 1, L = Math.sqrt(L2);
+    const rx = x - (A.x + B.x) / 2, ry = y - (A.y + B.y) / 2;
+    t.lu = +((rx * dx + ry * dy) / L2).toFixed(3); t.lv = Math.round((-rx * dy + ry * dx) / L);
+  }
+  dibujar();
+}
 function soltar(e) {
   punteros.delete(e.pointerId);
   if (!gesto) return;
   if (gesto.tipo === 'pinch') { if (punteros.size === 0) gesto = null; return; }
-  if (gesto.movio) { if (gesto.tipo === 'nodo') guardar(); }
+  if (gesto.movio) { if (gesto.tipo === 'nodo' || gesto.tipo === 'etiqueta') guardar(); }
   else if (gesto.tipo === 'nodo') verNodo(gesto.id);
   else if (gesto.tid) verTecnica(gesto.tid);
   else { cerrarHoja(); }
@@ -405,6 +430,7 @@ function editarTecnica(id, desde) {
     <input type="range" id="tProb" min="0" max="100" step="5" value="${t.prob}">
     <label>Cuánto me gusta</label><div class="stars" id="tGusto">${[1,2,3,4,5].map(i => `<button data-v="${i}">★</button>`).join('')}</div>
     <label>Notas</label><textarea id="tNotas" placeholder="Detalles, setups, errores comunes…">${esc(t.notas)}</textarea>
+    ${t.lu != null ? '<div class="fila"><button id="tEnderezar">↺ Volver la flecha a su lugar</button></div>' : ''}
     <div class="fila fin">${id ? '<button class="peligro" id="tBorrar" style="margin-right:auto">Eliminar</button>' : ''}<button id="tCanc">Cancelar</button><button class="pri" id="tOk">Guardar</button></div>`);
   const pintarG = () => $('#tGusto').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v <= gusto));
   pintarG();
@@ -425,10 +451,12 @@ function editarTecnica(id, desde) {
         x: origen.x + (cant % 2 ? -1 : 1) * (90 + 50 * cant), y: origen.y + 200 };
       D.nodos.push(nuevo); a = nuevo.id;
     }
+    if (a !== t.a) { delete t.lu; delete t.lv; }
     Object.assign(t, { nombre, tipo, a, prob: +$('#tProb').value, gusto, notas: $('#tNotas').value.trim() });
     if (!id) D.tecnicas.push(t);
     guardar(); verNodo(t.de);
   };
+  $('#tEnderezar') && ($('#tEnderezar').onclick = () => { delete t.lu; delete t.lv; guardar(); editarTecnica(id); });
   $('#tBorrar') && ($('#tBorrar').onclick = () => {
     if (!confirm(`¿Eliminar "${t.nombre}"?`)) return;
     D.tecnicas = D.tecnicas.filter(x => x.id !== id); guardar(); cerrarHoja();
