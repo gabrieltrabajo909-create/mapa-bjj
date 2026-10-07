@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0E1014">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Mi Juego BJJ</title>
+<style>
+  :root { --bg:#0E1014; --pan:#171b23; --pan2:#1f2430; --borde:#2c3340; --txt:#e8ecf2; --dim:#8b95a5; --ac:#ffd166; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font-family: system-ui, -apple-system, Roboto, sans-serif; overflow:hidden; }
+  button { font:inherit; color:inherit; background:var(--pan2); border:1px solid var(--borde); border-radius:10px; padding:9px 12px; cursor:pointer; }
+  button.pri { background:var(--ac); color:#111; border-color:var(--ac); font-weight:600; }
+  button.peligro { color:#ff8a8a; }
+  input, select, textarea { font:inherit; color:var(--txt); background:var(--bg); border:1px solid var(--borde); border-radius:10px; padding:9px 10px; width:100%; }
+  textarea { min-height:64px; resize:vertical; }
+  label { display:block; font-size:13px; color:var(--dim); margin:12px 0 5px; }
+  #barra { position:fixed; top:0; left:0; right:0; display:flex; gap:8px; align-items:center; padding:10px 12px; padding-top:max(10px, env(safe-area-inset-top)); background:linear-gradient(var(--bg) 70%, transparent); z-index:5; }
+  #barra h1 { font-size:17px; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #barra button { padding:8px 11px; }
+  #mapa { position:fixed; inset:0; width:100%; height:100%; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #hoja { position:fixed; left:0; right:0; bottom:0; max-height:72vh; overflow-y:auto; background:var(--pan); border-top:1px solid var(--borde); border-radius:18px 18px 0 0; padding:14px 16px calc(18px + env(safe-area-inset-bottom)); z-index:10; transform:translateY(105%); transition:transform .22s; }
+  #hoja.abierta { transform:none; }
+  .fila { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .fila.fin { justify-content:flex-end; margin-top:14px; }
+  .cab { display:flex; gap:12px; align-items:center; margin-bottom:8px; }
+  .cab h2 { margin:0; font-size:19px; flex:1; }
+  .ico { width:56px; height:56px; border-radius:50%; background:var(--pan2); display:flex; align-items:center; justify-content:center; overflow:hidden; flex:none; font-size:30px; }
+  .ico img { width:100%; height:100%; object-fit:cover; }
+  .tec { display:flex; gap:10px; align-items:center; padding:10px; border:1px solid var(--borde); border-radius:12px; margin:6px 0; background:var(--pan2); }
+  .tec .bar { width:5px; align-self:stretch; border-radius:3px; }
+  .tec .info { flex:1; min-width:0; }
+  .tec .nom { font-weight:600; }
+  .tec .sub { font-size:12.5px; color:var(--dim); }
+  .estrellas { color:var(--ac); letter-spacing:1px; }
+  .seccion { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:16px 0 4px; }
+  .notas { white-space:pre-wrap; color:#c9d1dc; font-size:14px; background:var(--bg); border-radius:10px; padding:8px 10px; }
+  .grilla { display:grid; grid-template-columns:repeat(auto-fill, minmax(70px,1fr)); gap:6px; max-height:260px; overflow-y:auto; padding:2px; }
+  .grilla .op { display:flex; flex-direction:column; align-items:center; gap:2px; padding:5px 2px; border:2px solid transparent; border-radius:10px; background:var(--pan2); font-size:10.5px; color:var(--dim); text-align:center; }
+  .grilla .op.sel { border-color:var(--ac); color:var(--txt); }
+  .grilla .op .em { font-size:30px; height:44px; line-height:44px; }
+  .seg { display:flex; border:1px solid var(--borde); border-radius:10px; overflow:hidden; }
+  .seg button { flex:1; border:0; border-radius:0; background:transparent; }
+  .seg button.sel { background:var(--pan2); color:var(--ac); font-weight:600; }
+  .stars button { background:none; border:0; font-size:28px; padding:0 3px; color:#4a5263; }
+  .stars button.on { color:var(--ac); }
+  input[type=range] { padding:0; accent-color:var(--ac); }
+  #menu { position:fixed; top:56px; right:10px; background:var(--pan); border:1px solid var(--borde); border-radius:14px; padding:6px; z-index:20; display:none; min-width:210px; box-shadow:0 8px 30px #0008; }
+  #menu.abierto { display:block; }
+  #menu button { display:block; width:100%; text-align:left; background:none; border:0; padding:11px 12px; }
+  #menu hr { border:0; border-top:1px solid var(--borde); margin:4px 0; }
+  #lista { position:fixed; inset:0; background:var(--bg); z-index:15; overflow-y:auto; padding:16px; padding-top:max(16px, env(safe-area-inset-top)); display:none; }
+  #lista.abierta { display:block; }
+  .leyenda { display:flex; flex-wrap:wrap; gap:6px 12px; font-size:12.5px; color:var(--dim); margin:6px 0 10px; }
+  .leyenda span::before { content:''; display:inline-block; width:14px; height:4px; border-radius:2px; background:var(--c); margin-right:5px; vertical-align:middle; }
+  #ayuda { position:fixed; bottom:max(14px, env(safe-area-inset-bottom)); left:0; right:0; text-align:center; color:var(--dim); font-size:12.5px; pointer-events:none; }
+  #toast { position:fixed; left:50%; top:70px; transform:translateX(-50%); background:var(--pan2); border:1px solid var(--borde); padding:9px 14px; border-radius:20px; z-index:30; display:none; font-size:14px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <marker id="flechaIc" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffd166"/></marker>
+  </defs>
+</svg>
+
+<svg id="mapa"><defs id="defs"></defs><g id="mundo"><g id="capaT"></g><g id="capaN"></g></g></svg>
+
+<div id="barra">
+  <h1 id="titulo">Mi Juego BJJ</h1>
+  <button id="bCentrar" title="Centrar">⤢</button>
+  <button id="bLista" title="Lista">☰ Lista</button>
+  <button id="bNuevo" class="pri" title="Nueva posición">＋</button>
+  <button id="bMenu" title="Menú">⋮</button>
+</div>
+<div id="menu">
+  <button data-a="nombre">✏️ Nombre del jugador</button>
+  <button data-a="bajar">⬇️ Bajar TXT</button>
+  <button data-a="subir">⬆️ Subir TXT</button>
+  <hr>
+  <button data-a="ordenar">🧭 Ordenar mapa</button>
+  <button data-a="ejemplo">📋 Cargar mapa de ejemplo</button>
+  <button data-a="borrar" class="peligro">🗑️ Empezar de cero</button>
+</div>
+<input type="file" id="archivo" accept=".txt,text/plain" hidden>
+<input type="file" id="foto" accept="image/*" hidden>
+<div id="hoja"></div>
+<div id="lista"></div>
+<div id="ayuda">Tocá una posición · arrastrá para mover · pellizcá para zoom</div>
+<div id="toast"></div>
+
+<script src="icons.js"></script>
+<script>
+const CLAVE = 'mapa-bjj-v1';
+const TIPOS = {
+  derribo:   { n:'Derribo',    c:'#ffd166' },
+  guardia:   { n:'Ir a guardia', c:'#f4a261' },
+  pasaje:    { n:'Pasaje',     c:'#06d6a0' },
+  barrida:   { n:'Barrida',    c:'#b388ff' },
+  transicion:{ n:'Transición', c:'#4dd0e1' },
+  sumision:  { n:'Sumisión',   c:'#ff6b6b' },
+  escape:    { n:'Escape',     c:'#9aa4b2' },
+};
+const R = 34;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const estrellas = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+
+let D, vista = { x: 0, y: 0, k: 1 }, sel = null;
+
+// ---------- Datos ----------
+function ejemplo() {
+  const n = (id, nombre, icono, x, y, tipo = 'pos') => ({ id, nombre, icono, x, y, tipo, notas: '' });
+  const t = (de, a, nombre, tipo, prob = 50, gusto = 3) => ({ id: uid(), de, a, nombre, tipo, prob, gusto, notas: '' });
+  return {
+    nombre: '',
+    nodos: [
+      n('pie', 'De pie', 'de_pie', 0, 0),
+      n('gc', 'Guardia cerrada', 'guardia_cerrada', -220, 220),
+      n('mg', 'Media guardia', 'media_guardia', -60, 300),
+      n('side', 'Side control', 'side_control', 200, 220),
+      n('mont', 'Montada', 'montada', 120, 460),
+      n('esp', 'Espalda', 'espalda', 300, 600),
+      n('arm', 'Armbar', 'armbar', -280, 470, 'sub'),
+      n('tri', 'Triángulo', 'triangulo', -140, 560, 'sub'),
+      n('kim', 'Kimura', 'kimura', 380, 400, 'sub'),
+      n('ml', 'Mata león', 'mata_leon', 300, 800, 'sub'),
+      n('am', 'Americana', 'americana', 40, 680, 'sub'),
+    ],
+    tecnicas: [
+      t('pie', 'side', 'Doble pierna', 'derribo', 50, 4),
+      t('pie', 'gc', 'Sentarse en guardia', 'guardia', 90, 3),
+      t('gc', 'mont', 'Barrida de cadera', 'barrida', 40, 3),
+      t('gc', 'arm', 'Armbar desde guardia', 'sumision', 30, 4),
+      t('gc', 'tri', 'Triángulo', 'sumision', 30, 4),
+      t('mg', 'side', 'Pasaje de media', 'pasaje', 50, 3),
+      t('side', 'mont', 'Subir a la montada', 'transicion', 60, 4),
+      t('side', 'kim', 'Kimura', 'sumision', 40, 3),
+      t('mont', 'esp', 'Tomar la espalda', 'transicion', 50, 4),
+      t('mont', 'am', 'Americana', 'sumision', 40, 3),
+      t('esp', 'ml', 'Mata león', 'sumision', 60, 5),
+    ],
+  };
+}
+function cargar() {
+  try { D = JSON.parse(localStorage.getItem(CLAVE)); } catch { D = null; }
+  if (!D || !Array.isArray(D.nodos)) D = ejemplo();
+}
+function guardar() { localStorage.setItem(CLAVE, JSON.stringify(D)); }
+const nodo = id => D.nodos.find(n => n.id === id);
+
+// ---------- Íconos ----------
+function icoHTML(icono) {
+  if (!icono) return '🥋';
+  if (icono.startsWith('img:')) return `<img src="${icono.slice(4)}">`;
+  if (icono.startsWith('emoji:')) return icono.slice(6);
+  return iconoSVG(icono, 50) || '🥋';
+}
+function icoSVG(icono, x, y, s) {
+  if (icono && icono.startsWith('img:')) return `<image href="${icono.slice(4)}" x="${x - s/2}" y="${y - s/2}" width="${s}" height="${s}" clip-path="url(#clipN)" preserveAspectRatio="xMidYMid slice"/>`;
+  if (!icono || icono.startsWith('emoji:')) return `<text x="${x}" y="${y + 11}" text-anchor="middle" font-size="32">${esc(icono ? icono.slice(6) : '🥋')}</text>`;
+  return `<svg x="${x - s/2}" y="${y - s/2}" width="${s}" height="${s}" viewBox="0 0 64 64">${iconoSVG(icono).replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg>`;
+}
+
+// ---------- Dibujo ----------
+function curva(t, idx, total) {
+  const A = nodo(t.de), B = nodo(t.a);
+  if (!A || !B) return null;
+  if (A === B) { // técnica que vuelve a la misma posición
+    const p = `M${A.x - 14} ${A.y - R + 2} C${A.x - 70} ${A.y - 120}, ${A.x + 70} ${A.y - 120}, ${A.x + 14} ${A.y - R + 2}`;
+    return { d: p, lx: A.x, ly: A.y - 100 };
+  }
+  const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
+  const off = 22 + (idx - (total - 1) / 2) * 34;
+  const cx = (A.x + B.x) / 2 - dy / L * off, cy = (A.y + B.y) / 2 + dx / L * off;
+  const ajus = (P, Q, r) => { const vx = Q.x - P.x, vy = Q.y - P.y, l = Math.hypot(vx, vy) || 1; return { x: P.x + vx / l * r, y: P.y + vy / l * r }; };
+  const s = ajus(A, { x: cx, y: cy }, R + 2), e = ajus(B, { x: cx, y: cy }, R + 13);
+  return { d: `M${s.x} ${s.y} Q${cx} ${cy} ${e.x} ${e.y}`, lx: .25 * A.x + .5 * cx + .25 * B.x, ly: .25 * A.y + .5 * cy + .25 * B.y };
+}
+function dibujar() {
+  $('#titulo').textContent = D.nombre ? `Juego de ${D.nombre}` : 'Mi Juego BJJ';
+  $('#defs').innerHTML = `<clipPath id="clipN" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>` +
+    Object.entries(TIPOS).map(([k, v]) => `<marker id="m_${k}" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="${v.c}"/></marker>`).join('');
+  // agrupar técnicas entre el mismo par para separarlas
+  const grupos = {};
+  D.tecnicas.forEach(t => { const k = t.de + '>' + t.a; (grupos[k] = grupos[k] || []).push(t); });
+  let htmlT = '', htmlL = '';
+  Object.values(grupos).forEach(g => g.forEach((t, i) => {
+    const c = curva(t, i, g.length); if (!c) return;
+    const tp = TIPOS[t.tipo] || TIPOS.transicion, w = 1.5 + (t.gusto || 3) * 1.1, op = .35 + (t.prob ?? 50) / 100 * .65;
+    const on = sel && (sel.t === t.id || sel.n === t.de || sel.n === t.a);
+    const dim = sel && !on ? .15 : 1;
+    htmlT += `<g data-t="${t.id}" opacity="${dim}"><path d="${c.d}" stroke="transparent" stroke-width="22" fill="none"/>` +
+      `<path d="${c.d}" stroke="${tp.c}" stroke-opacity="${op}" stroke-width="${sel && sel.t === t.id ? w + 2 : w}" fill="none" stroke-linecap="round" marker-end="url(#m_${t.tipo in TIPOS ? t.tipo : 'transicion'})"/></g>`;
+    const txt = `${t.nombre} · ${t.prob ?? 50}%`, ancho = txt.length * 6.4 + 12;
+    htmlL += `<g data-t="${t.id}" opacity="${dim}"><rect x="${c.lx - ancho / 2}" y="${c.ly - 10}" width="${ancho}" height="20" rx="10" fill="#0E1014" stroke="${tp.c}" stroke-opacity=".6"/>` +
+      `<text x="${c.lx}" y="${c.ly + 4}" text-anchor="middle" font-size="11.5" fill="#e8ecf2">${esc(txt)}</text></g>`;
+  }));
+  $('#capaT').innerHTML = htmlT + htmlL;
+  $('#capaN').innerHTML = D.nodos.map(n => {
+    const elegido = sel && sel.n === n.id;
+    const vecino = sel && sel.n && D.tecnicas.some(t => (t.de === sel.n && t.a === n.id) || (t.a === sel.n && t.de === n.id));
+    const dim = sel && !elegido && !vecino && !(sel.t && (() => { const t = D.tecnicas.find(t => t.id === sel.t); return t && (t.de === n.id || t.a === n.id); })()) ? .3 : 1;
+    const borde = elegido ? '#ffd166' : n.tipo === 'sub' ? '#ff6b6b' : '#4d5a70';
+    return `<g data-n="${n.id}" opacity="${dim}" style="cursor:pointer">
+      <circle cx="${n.x}" cy="${n.y}" r="${R}" fill="#1a1f29" stroke="${borde}" stroke-width="${elegido ? 4 : 2.5}"/>
+      ${icoSVG(n.icono, n.x, n.y, 56)}
+      <text x="${n.x}" y="${n.y + R + 17}" text-anchor="middle" font-size="13.5" font-weight="600" fill="#e8ecf2" stroke="#0E1014" stroke-width="4" paint-order="stroke">${esc(n.nombre)}</text>
+    </g>`;
+  }).join('');
+  aplicarVista();
+}
+function aplicarVista() { $('#mundo').setAttribute('transform', `translate(${vista.x} ${vista.y}) scale(${vista.k})`); }
+function centrar() {
+  if (!D.nodos.length) { vista = { x: innerWidth / 2, y: innerHeight / 2, k: 1 }; return aplicarVista(); }
+  const xs = D.nodos.map(n => n.x), ys = D.nodos.map(n => n.y);
+  const x0 = Math.min(...xs) - 80, x1 = Math.max(...xs) + 80, y0 = Math.min(...ys) - 80, y1 = Math.max(...ys) + 90;
+  const W = innerWidth, H = innerHeight - 70;
+  const k = Math.min(1.4, W / (x1 - x0), H / (y1 - y0));
+  vista = { k, x: W / 2 - (x0 + x1) / 2 * k, y: 70 + H / 2 - (y0 + y1) / 2 * k };
+  aplicarVista();
+}
+
+// ---------- Gestos (mover, pan, zoom) ----------
+const svg = $('#mapa'), punteros = new Map();
+let gesto = null;
+const aMundo = (cx, cy) => ({ x: (cx - vista.x) / vista.k, y: (cy - vista.y) / vista.k });
+svg.addEventListener('pointerdown', e => {
+  svg.setPointerCapture(e.pointerId);
+  punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (punteros.size === 2) {
+    const [p, q] = [...punteros.values()];
+    gesto = { tipo: 'pinch', d0: Math.hypot(p.x - q.x, p.y - q.y), k0: vista.k, v0: { ...vista }, m: { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 } };
+    return;
+  }
+  const gN = e.target.closest('[data-n]'), gT = e.target.closest('[data-t]');
+  gesto = { tipo: gN ? 'nodo' : 'pan', id: gN?.dataset.n, tid: gT?.dataset.t, x0: e.clientX, y0: e.clientY, v0: { ...vista }, movio: false };
+  if (gN) { const n = nodo(gN.dataset.n); gesto.nx = n.x; gesto.ny = n.y; }
+});
+svg.addEventListener('pointermove', e => {
+  if (!punteros.has(e.pointerId)) return;
+  punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!gesto) return;
+  if (gesto.tipo === 'pinch' && punteros.size >= 2) {
+    const [p, q] = [...punteros.values()];
+    const k = Math.max(.2, Math.min(3, gesto.k0 * Math.hypot(p.x - q.x, p.y - q.y) / gesto.d0));
+    const m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+    const w = { x: (gesto.m.x - gesto.v0.x) / gesto.v0.k, y: (gesto.m.y - gesto.v0.y) / gesto.v0.k };
+    vista = { k, x: m.x - w.x * k, y: m.y - w.y * k };
+    return aplicarVista();
+  }
+  const dx = e.clientX - gesto.x0, dy = e.clientY - gesto.y0;
+  if (!gesto.movio && Math.hypot(dx, dy) < 7) return;
+  gesto.movio = true;
+  if (gesto.tipo === 'nodo') { const n = nodo(gesto.id); n.x = Math.round(gesto.nx + dx / vista.k); n.y = Math.round(gesto.ny + dy / vista.k); dibujar(); }
+  else if (gesto.tipo === 'pan') { vista.x = gesto.v0.x + dx; vista.y = gesto.v0.y + dy; aplicarVista(); }
+});
+function soltar(e) {
+  punteros.delete(e.pointerId);
+  if (!gesto) return;
+  if (gesto.tipo === 'pinch') { if (punteros.size === 0) gesto = null; return; }
+  if (gesto.movio) { if (gesto.tipo === 'nodo') guardar(); }
+  else if (gesto.tipo === 'nodo') verNodo(gesto.id);
+  else if (gesto.tid) verTecnica(gesto.tid);
+  else { cerrarHoja(); }
+  gesto = null;
+}
+svg.addEventListener('pointerup', soltar);
+svg.addEventListener('pointercancel', soltar);
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const k = Math.max(.2, Math.min(3, vista.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  const w = aMundo(e.clientX, e.clientY);
+  vista = { k, x: e.clientX - w.x * k, y: e.clientY - w.y * k }; aplicarVista();
+}, { passive: false });
+
+// ---------- Hoja inferior ----------
+const hoja = $('#hoja');
+function abrirHoja(html) { hoja.innerHTML = html; hoja.classList.add('abierta'); hoja.scrollTop = 0; $('#ayuda').style.display = 'none'; }
+function cerrarHoja() { hoja.classList.remove('abierta'); sel = null; dibujar(); $('#ayuda').style.display = ''; }
+
+function filaTec(t, haciaDestino) {
+  const otro = nodo(haciaDestino ? t.a : t.de), tp = TIPOS[t.tipo] || TIPOS.transicion;
+  return `<div class="tec" data-vt="${t.id}"><div class="bar" style="background:${tp.c}"></div>
+    <div class="info"><div class="nom">${esc(t.nombre)}</div>
+    <div class="sub">${tp.n} · ${haciaDestino ? '→' : '←'} ${esc(otro?.nombre)}</div></div>
+    <div style="text-align:right"><div style="font-weight:600">${t.prob ?? 50}%</div><div class="estrellas" style="font-size:12px">${estrellas(t.gusto || 0)}</div></div></div>`;
+}
+const ordenTec = (a, b) => (b.gusto - a.gusto) || (b.prob - a.prob);
+
+function verNodo(id) {
+  const n = nodo(id); if (!n) return;
+  sel = { n: id }; dibujar();
+  const sale = D.tecnicas.filter(t => t.de === id).sort(ordenTec), entra = D.tecnicas.filter(t => t.a === id && t.de !== id);
+  abrirHoja(`<div class="cab"><div class="ico">${icoHTML(n.icono)}</div><h2>${esc(n.nombre)}</h2><button id="hEdit">✏️</button></div>
+    ${n.notas ? `<div class="notas">${esc(n.notas)}</div>` : ''}
+    <div class="seccion">Desde acá aplico (${sale.length})</div>
+    ${sale.map(t => filaTec(t, true)).join('') || '<div class="sub" style="color:var(--dim)">Todavía nada. Agregá una técnica.</div>'}
+    <button class="pri" id="hAdd" style="width:100%;margin-top:6px">＋ Técnica desde ${esc(n.nombre)}</button>
+    ${entra.length ? `<div class="seccion">Llego acá desde</div>${entra.map(t => filaTec(t, false)).join('')}` : ''}`);
+  $('#hEdit').onclick = () => editarNodo(id);
+  $('#hAdd').onclick = () => editarTecnica(null, id);
+  hoja.querySelectorAll('[data-vt]').forEach(el => el.onclick = () => editarTecnica(el.dataset.vt));
+}
+function verTecnica(id) { editarTecnica(id); }
+
+// ---- Selector de ícono ----
+function selectorIcono(actual, onPick) {
+  const ops = [
+    ...Object.entries(ICONOS).filter(([, v]) => v.cat === 'pos').map(([k, v]) => ({ v: k, h: iconoSVG(k, 44), n: v.n })),
+    ...Object.entries(ICONOS).filter(([, v]) => v.cat === 'sub').map(([k, v]) => ({ v: k, h: iconoSVG(k, 44), n: v.n })),
+    ...EMOJIS.map(e => ({ v: 'emoji:' + e, h: `<span class="em">${e}</span>`, n: '' })),
+  ];
+  if (actual && actual.startsWith('img:')) ops.unshift({ v: actual, h: `<img src="${actual.slice(4)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`, n: 'Tu foto' });
+  return `<div class="grilla" id="grilla">${ops.map(o => `<div class="op ${o.v === actual ? 'sel' : ''}" data-ic="${esc(o.v)}">${o.h}<span>${esc(o.n)}</span></div>`).join('')}</div>
+    <button id="bFoto" style="margin-top:8px">📷 Usar foto / imagen propia</button>`;
+}
+function conectarSelector(onPick) {
+  const g = $('#grilla');
+  g.querySelectorAll('.op').forEach(el => el.onclick = () => { g.querySelectorAll('.op').forEach(o => o.classList.remove('sel')); el.classList.add('sel'); onPick(el.dataset.ic); });
+  $('#bFoto').onclick = () => {
+    const inp = $('#foto'); inp.value = '';
+    inp.onchange = () => {
+      const f = inp.files[0]; if (!f) return;
+      const img = new Image();
+      img.onload = () => {
+        const s = 160, c = document.createElement('canvas'); c.width = c.height = s;
+        const m = Math.min(img.width, img.height);
+        c.getContext('2d').drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, s, s);
+        const url = 'img:' + c.toDataURL('image/jpeg', .8);
+        g.querySelectorAll('.op').forEach(o => o.classList.remove('sel'));
+        g.insertAdjacentHTML('afterbegin', `<div class="op sel" data-ic="${url}"><img src="${url.slice(4)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover"><span>Tu foto</span></div>`);
+        onPick(url); URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(f);
+    };
+    inp.click();
+  };
+}
+function iconoPorNombre(nombre) {
+  const s = nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  for (const [k, v] of Object.entries(ICONOS)) {
+    const n = v.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (s.includes(n) || n.includes(s)) return k;
+  }
+  return null;
+}
+
+// ---- Editar posición ----
+function editarNodo(id, opts = {}) {
+  const n = id ? nodo(id) : { id: uid(), nombre: '', icono: null, tipo: 'pos', notas: '', ...opts };
+  let icono = n.icono, tipo = n.tipo || 'pos';
+  sel = id ? { n: id } : null; dibujar();
+  abrirHoja(`<div class="cab"><h2>${id ? 'Editar posición' : 'Nueva posición'}</h2></div>
+    <label>Nombre</label><input id="fNom" value="${esc(n.nombre)}" placeholder="Ej: Guardia araña">
+    <label>Tipo</label><div class="seg" id="fTipo"><button data-v="pos">Posición</button><button data-v="sub">Sumisión / final</button></div>
+    <label>Ícono</label>${selectorIcono(icono)}
+    <label>Notas</label><textarea id="fNotas" placeholder="Detalles, agarres, qué me funciona…">${esc(n.notas)}</textarea>
+    <div class="fila fin">${id ? '<button class="peligro" id="fBorrar" style="margin-right:auto">Eliminar</button>' : ''}<button id="fCanc">Cancelar</button><button class="pri" id="fOk">Guardar</button></div>`);
+  const pintarTipo = () => $('#fTipo').querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === tipo));
+  pintarTipo();
+  $('#fTipo').onclick = e => { if (e.target.dataset.v) { tipo = e.target.dataset.v; pintarTipo(); } };
+  conectarSelector(v => icono = v);
+  $('#fNom').oninput = () => { if (!icono) { const k = iconoPorNombre($('#fNom').value); if (k) { tipo = ICONOS[k].cat; pintarTipo(); } } };
+  $('#fCanc').onclick = () => id ? verNodo(id) : cerrarHoja();
+  $('#fOk').onclick = () => {
+    const nombre = $('#fNom').value.trim(); if (!nombre) return toast('Poné un nombre');
+    if (!icono) icono = iconoPorNombre(nombre) || 'emoji:🥋';
+    Object.assign(n, { nombre, icono, tipo, notas: $('#fNotas').value.trim() });
+    if (!id) {
+      if (n.x == null) { const c = aMundo(innerWidth / 2, innerHeight / 2.4); n.x = Math.round(c.x); n.y = Math.round(c.y); }
+      D.nodos.push(n);
+    }
+    guardar(); verNodo(n.id);
+  };
+  $('#fBorrar') && ($('#fBorrar').onclick = () => {
+    const k = D.tecnicas.filter(t => t.de === id || t.a === id).length;
+    if (!confirm(`¿Eliminar "${n.nombre}"${k ? ` y sus ${k} técnicas` : ''}?`)) return;
+    D.nodos = D.nodos.filter(x => x.id !== id); D.tecnicas = D.tecnicas.filter(t => t.de !== id && t.a !== id);
+    guardar(); cerrarHoja();
+  });
+  if (!id) setTimeout(() => $('#fNom').focus(), 250);
+}
+
+// ---- Editar técnica ----
+function editarTecnica(id, desde) {
+  const t = id ? D.tecnicas.find(x => x.id === id) : { id: uid(), de: desde, a: '', nombre: '', tipo: nodo(desde)?.nombre === 'De pie' ? 'derribo' : 'transicion', prob: 50, gusto: 3, notas: '' };
+  if (!t) return;
+  let gusto = t.gusto, tipo = t.tipo;
+  sel = id ? { t: id } : { n: t.de }; dibujar();
+  const origen = nodo(t.de);
+  const opciones = D.nodos.filter(n => true).sort((a, b) => a.nombre.localeCompare(b.nombre))
+    .map(n => `<option value="${n.id}" ${n.id === t.a ? 'selected' : ''}>${esc(n.nombre)}${n.tipo === 'sub' ? ' (final)' : ''}</option>`).join('');
+  abrirHoja(`<div class="cab"><h2>${id ? 'Técnica' : 'Nueva técnica'}</h2><span style="color:var(--dim);font-size:13px">desde ${esc(origen?.nombre)}</span></div>
+    <label>Nombre de la técnica</label><input id="tNom" value="${esc(t.nombre)}" placeholder="Ej: Doble pierna, Toreando, Tijera…">
+    <label>Tipo</label><select id="tTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === tipo ? 'selected' : ''}>${v.n}</option>`).join('')}</select>
+    <label>¿A dónde caigo?</label>
+    <select id="tA"><option value="">— Elegí —</option>${opciones}<option value="__nuevo">➕ Nueva posición / sumisión…</option></select>
+    <div id="tNuevo" style="display:none"><input id="tNuevoNom" placeholder="Nombre de la nueva posición" style="margin-top:6px"></div>
+    <label>Factibilidad: <b id="tProbV">${t.prob}%</b> <span style="font-size:12px">(qué tan seguido me sale)</span></label>
+    <input type="range" id="tProb" min="0" max="100" step="5" value="${t.prob}">
+    <label>Cuánto me gusta</label><div class="stars" id="tGusto">${[1,2,3,4,5].map(i => `<button data-v="${i}">★</button>`).join('')}</div>
+    <label>Notas</label><textarea id="tNotas" placeholder="Detalles, setups, errores comunes…">${esc(t.notas)}</textarea>
+    <div class="fila fin">${id ? '<button class="peligro" id="tBorrar" style="margin-right:auto">Eliminar</button>' : ''}<button id="tCanc">Cancelar</button><button class="pri" id="tOk">Guardar</button></div>`);
+  const pintarG = () => $('#tGusto').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v <= gusto));
+  pintarG();
+  $('#tGusto').onclick = e => { if (e.target.dataset.v) { gusto = +e.target.dataset.v; pintarG(); } };
+  $('#tProb').oninput = () => $('#tProbV').textContent = $('#tProb').value + '%';
+  $('#tA').onchange = () => { $('#tNuevo').style.display = $('#tA').value === '__nuevo' ? '' : 'none'; if ($('#tA').value === '__nuevo') $('#tNuevoNom').focus(); };
+  $('#tCanc').onclick = () => id ? cerrarHoja() : verNodo(t.de);
+  $('#tOk').onclick = () => {
+    const nombre = $('#tNom').value.trim(); if (!nombre) return toast('Poné el nombre de la técnica');
+    let a = $('#tA').value;
+    tipo = $('#tTipo').value;
+    if (!a) return toast('Elegí a dónde caés');
+    if (a === '__nuevo') {
+      const nn = $('#tNuevoNom').value.trim(); if (!nn) return toast('Nombre de la nueva posición');
+      const ic = iconoPorNombre(nn);
+      const cant = D.tecnicas.filter(x => x.de === t.de).length;
+      const nuevo = { id: uid(), nombre: nn, icono: ic || 'emoji:🥋', tipo: tipo === 'sumision' || (ic && ICONOS[ic].cat === 'sub') ? 'sub' : 'pos', notas: '',
+        x: origen.x + (cant % 2 ? -1 : 1) * (90 + 50 * cant), y: origen.y + 200 };
+      D.nodos.push(nuevo); a = nuevo.id;
+    }
+    Object.assign(t, { nombre, tipo, a, prob: +$('#tProb').value, gusto, notas: $('#tNotas').value.trim() });
+    if (!id) D.tecnicas.push(t);
+    guardar(); verNodo(t.de);
+  };
+  $('#tBorrar') && ($('#tBorrar').onclick = () => {
+    if (!confirm(`¿Eliminar "${t.nombre}"?`)) return;
+    D.tecnicas = D.tecnicas.filter(x => x.id !== id); guardar(); cerrarHoja();
+  });
+}
+
+// ---------- Lista ----------
+function verLista() {
+  const L = $('#lista');
+  const orden = [...D.nodos].sort((a, b) => (a.tipo === 'sub') - (b.tipo === 'sub') || a.y - b.y);
+  L.innerHTML = `<div class="fila" style="margin-bottom:6px"><h2 style="flex:1;margin:0;font-size:20px">${esc($('#titulo').textContent)}</h2><button id="lCerrar">✕ Mapa</button></div>
+    <div class="leyenda">${Object.values(TIPOS).map(v => `<span style="--c:${v.c}">${v.n}</span>`).join('')}</div>
+    <div class="sub" style="color:var(--dim);font-size:12.5px">Grosor de flecha = cuánto me gusta · brillo = factibilidad</div>
+    ${orden.map(n => {
+      const sale = D.tecnicas.filter(t => t.de === n.id).sort(ordenTec);
+      return `<div class="cab" style="margin-top:18px" data-ln="${n.id}"><div class="ico" style="width:44px;height:44px;font-size:24px">${icoHTML(n.icono)}</div><h2 style="font-size:17px">${esc(n.nombre)}</h2></div>
+        ${sale.map(t => filaTec(t, true)).join('') || (n.tipo === 'sub' ? '' : '<div style="color:var(--dim);font-size:13px">Sin técnicas todavía</div>')}`;
+    }).join('')}<div style="height:40px"></div>`;
+  L.classList.add('abierta');
+  $('#lCerrar').onclick = () => L.classList.remove('abierta');
+  L.querySelectorAll('[data-vt]').forEach(el => el.onclick = () => { L.classList.remove('abierta'); editarTecnica(el.dataset.vt); });
+  L.querySelectorAll('[data-ln]').forEach(el => el.onclick = () => { L.classList.remove('abierta'); verNodo(el.dataset.ln); });
+}
+
+// ---------- TXT ----------
+const MARCA = '----- DATOS (no editar debajo de esta línea) -----';
+function aTexto() {
+  let s = `MI JUEGO BJJ${D.nombre ? ' — ' + D.nombre : ''}\nExportado: ${new Date().toLocaleDateString('es-AR')}\n`;
+  s += `Abrilo en https://gabrieltrabajo909-create.github.io/mapa-bjj/ (Menú → Subir TXT)\n\n`;
+  [...D.nodos].sort((a, b) => a.y - b.y).forEach(n => {
+    const sale = D.tecnicas.filter(t => t.de === n.id).sort(ordenTec);
+    s += `== ${n.nombre}${n.tipo === 'sub' ? ' (sumisión)' : ''} ==\n`;
+    if (n.notas) s += `   ${n.notas.replace(/\n/g, '\n   ')}\n`;
+    sale.forEach(t => s += `  → ${t.nombre} [${(TIPOS[t.tipo] || {}).n}] → ${nodo(t.a)?.nombre} · ${t.prob}% · ${estrellas(t.gusto)}${t.notas ? `\n      ${t.notas.replace(/\n/g, '\n      ')}` : ''}\n`);
+    s += '\n';
+  });
+  return s + MARCA + '\n' + JSON.stringify(D);
+}
+function bajar() {
+  const nom = 'juego-bjj' + (D.nombre ? '-' + D.nombre.toLowerCase().replace(/[^a-z0-9]+/gi, '-') : '') + '.txt';
+  const blob = new Blob([aTexto()], { type: 'text/plain;charset=utf-8' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  toast('TXT descargado');
+}
+$('#archivo').onchange = async () => {
+  const f = $('#archivo').files[0]; if (!f) return;
+  const txt = await f.text(), i = txt.indexOf(MARCA);
+  try {
+    const nuevo = JSON.parse(i >= 0 ? txt.slice(i + MARCA.length) : txt);
+    if (!Array.isArray(nuevo.nodos) || !Array.isArray(nuevo.tecnicas)) throw 0;
+    if (!confirm(`Cargar "${nuevo.nombre || 'juego sin nombre'}" (${nuevo.nodos.length} posiciones, ${nuevo.tecnicas.length} técnicas)? Reemplaza el mapa actual — bajá un TXT antes si querés guardarlo.`)) return;
+    D = nuevo; guardar(); sel = null; dibujar(); centrar(); toast('Juego cargado');
+  } catch { alert('Ese archivo no es un TXT de Mi Juego BJJ.'); }
+  $('#archivo').value = '';
+};
+
+// ---------- Ordenar automáticamente (por niveles desde "De pie") ----------
+function ordenar() {
+  if (!confirm('¿Reacomodar todas las posiciones automáticamente?')) return;
+  const nivel = {}, raices = D.nodos.filter(n => !D.tecnicas.some(t => t.a === n.id && t.de !== n.id));
+  const cola = (raices.length ? raices : D.nodos.slice(0, 1)).map(n => (nivel[n.id] = 0, n.id));
+  while (cola.length) { const id = cola.shift(); D.tecnicas.filter(t => t.de === id).forEach(t => { if (!(t.a in nivel)) { nivel[t.a] = nivel[id] + 1; cola.push(t.a); } }); }
+  D.nodos.forEach(n => { if (!(n.id in nivel)) nivel[n.id] = 0; });
+  const filas = {};
+  D.nodos.forEach(n => (filas[nivel[n.id]] = filas[nivel[n.id]] || []).push(n));
+  Object.entries(filas).forEach(([lv, ns]) => ns.sort((a, b) => a.x - b.x).forEach((n, i) => { n.x = (i - (ns.length - 1) / 2) * 170; n.y = lv * 210; }));
+  guardar(); dibujar(); centrar();
+}
+
+// ---------- Barra / menú ----------
+function toast(m) { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 1800); }
+$('#bNuevo').onclick = () => editarNodo(null);
+$('#bLista').onclick = verLista;
+$('#bCentrar').onclick = centrar;
+$('#bMenu').onclick = e => { e.stopPropagation(); $('#menu').classList.toggle('abierto'); };
+document.addEventListener('click', e => { if (!e.target.closest('#menu')) $('#menu').classList.remove('abierto'); });
+$('#menu').onclick = e => {
+  const a = e.target.dataset.a; if (!a) return;
+  $('#menu').classList.remove('abierto');
+  if (a === 'nombre') { const v = prompt('¿De quién es este juego?', D.nombre || ''); if (v != null) { D.nombre = v.trim(); guardar(); dibujar(); } }
+  if (a === 'bajar') bajar();
+  if (a === 'subir') $('#archivo').click();
+  if (a === 'ordenar') ordenar();
+  if (a === 'ejemplo' && confirm('¿Reemplazar tu mapa por el de ejemplo?')) { const nom = D.nombre; D = ejemplo(); D.nombre = nom; guardar(); cerrarHoja(); centrar(); }
+  if (a === 'borrar' && confirm('¿Borrar todo y empezar de cero? (bajá un TXT antes si querés guardarlo)')) {
+    D = { nombre: D.nombre, nodos: [{ id: uid(), nombre: 'De pie', icono: 'de_pie', tipo: 'pos', notas: '', x: 0, y: 0 }], tecnicas: [] };
+    guardar(); cerrarHoja(); centrar();
+  }
+};
+let anchoPrev = innerWidth;
+addEventListener('resize', () => { if (innerWidth !== anchoPrev) { anchoPrev = innerWidth; centrar(); } });
+
+cargar(); dibujar(); centrar();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
