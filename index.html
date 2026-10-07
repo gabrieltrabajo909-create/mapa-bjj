@@ -57,6 +57,9 @@
   .leyenda { display:flex; flex-wrap:wrap; gap:6px 12px; font-size:12.5px; color:var(--dim); margin:6px 0 10px; }
   .leyenda span::before { content:''; display:inline-block; width:14px; height:4px; border-radius:2px; background:var(--c); margin-right:5px; vertical-align:middle; }
   #ayuda { position:fixed; bottom:max(14px, env(safe-area-inset-bottom)); left:0; right:0; text-align:center; color:var(--dim); font-size:12.5px; pointer-events:none; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .chips button { padding:7px 11px; border-radius:18px; font-size:14px; }
+  .chips button.hecho { border-color:#ff6b6b; color:#ff8a8a; }
   #toast { position:fixed; left:50%; top:70px; transform:translateX(-50%); background:var(--pan2); border:1px solid var(--borde); padding:9px 14px; border-radius:20px; z-index:30; display:none; font-size:14px; }
 </style>
 </head>
@@ -67,43 +70,40 @@
   </defs>
 </svg>
 
-<svg id="mapa"><defs id="defs"></defs><g id="mundo"><g id="capaT"></g><g id="capaN"></g><g id="capaL"></g></g></svg>
+<svg id="mapa"><defs id="defs"></defs><g id="mundo"><g id="capaT"></g><g id="capaN"></g><g id="capaL"></g><line id="lineaCon" stroke="#ffd166" stroke-width="3" stroke-dasharray="8 6" style="display:none"/></g></svg>
 
 <div id="barra">
   <h1 id="titulo">Mi Juego BJJ</h1>
-  <button id="bCentrar" title="Centrar">⤢</button>
-  <button id="bLista" title="Lista">☰ Lista</button>
-  <button id="bNuevo" class="pri" title="Nueva posición">＋</button>
+  <button id="bPegar" style="display:none">📋</button>
+  <button id="bCentrar">⤢</button>
+  <button id="bLista">☰</button>
+  <button id="bNuevo" class="pri">＋</button>
   <button id="bMenu" title="Menú">⋮</button>
 </div>
-<div id="menu">
-  <button data-a="nombre">✏️ Nombre del jugador</button>
-  <button data-a="bajar">⬇️ Bajar TXT</button>
-  <button data-a="subir">⬆️ Subir TXT</button>
-  <hr>
-  <button data-a="ordenar">🧭 Ordenar mapa</button>
-  <button data-a="ejemplo">📋 Cargar mapa de ejemplo</button>
-  <button data-a="borrar" class="peligro">🗑️ Empezar de cero</button>
-</div>
+<div id="menu"></div>
 <input type="file" id="archivo" accept=".txt,text/plain" hidden>
 <input type="file" id="foto" accept="image/*" hidden>
 <div id="hoja"></div>
 <div id="lista"></div>
-<div id="ayuda">Tocá una posición · arrastrá posiciones o nombres de técnicas · pellizcá para zoom</div>
+<div id="ayuda"></div>
 <div id="toast"></div>
 
 <script src="icons.js"></script>
 <script>
 const CLAVE = 'mapa-bjj-v1';
+let LANG = 'en', primeraVez = false;
+try { LANG = localStorage.getItem('mapa-bjj-lang') || (primeraVez = true, 'es'); } catch {}
+const tr = (es, en) => LANG === 'en' ? en : es;
 const TIPOS = {
-  derribo:   { n:'Derribo',    c:'#ffd166' },
-  guardia:   { n:'Ir a guardia', c:'#f4a261' },
-  pasaje:    { n:'Pasaje',     c:'#06d6a0' },
-  barrida:   { n:'Barrida',    c:'#b388ff' },
-  transicion:{ n:'Transición', c:'#4dd0e1' },
-  sumision:  { n:'Sumisión',   c:'#ff6b6b' },
-  escape:    { n:'Escape',     c:'#9aa4b2' },
+  derribo:   { n:'Derribo',    e:'Takedown',   c:'#ffd166' },
+  guardia:   { n:'Ir a guardia', e:'Pull guard', c:'#f4a261' },
+  pasaje:    { n:'Pasaje',     e:'Guard pass', c:'#06d6a0' },
+  barrida:   { n:'Barrida',    e:'Sweep',      c:'#b388ff' },
+  transicion:{ n:'Transición', e:'Transition', c:'#4dd0e1' },
+  sumision:  { n:'Sumisión',   e:'Submission', c:'#ff6b6b' },
+  escape:    { n:'Escape',     e:'Escape',     c:'#9aa4b2' },
 };
+const tipoN = tp => tr(tp.n, tp.e);
 const R = 34;
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
@@ -119,30 +119,30 @@ function ejemplo() {
   return {
     nombre: '',
     nodos: [
-      n('pie', 'De pie', 'de_pie', 0, 0),
-      n('gc', 'Guardia cerrada', 'guardia_cerrada', -220, 220),
-      n('mg', 'Media guardia', 'media_guardia', -60, 300),
+      n('pie', tr('De pie', 'Standing'), 'de_pie', 0, 0),
+      n('gc', tr('Guardia cerrada', 'Closed guard'), 'guardia_cerrada', -220, 220),
+      n('mg', tr('Media guardia', 'Half guard'), 'media_guardia', -60, 300),
       n('side', 'Side control', 'side_control', 200, 220),
-      n('mont', 'Montada', 'montada', 120, 460),
-      n('esp', 'Espalda', 'espalda', 300, 600),
+      n('mont', tr('Montada', 'Mount'), 'montada', 120, 460),
+      n('esp', tr('Espalda', 'Back control'), 'espalda', 300, 600),
       n('arm', 'Armbar', 'armbar', -280, 470, 'sub'),
-      n('tri', 'Triángulo', 'triangulo', -140, 560, 'sub'),
+      n('tri', tr('Triángulo', 'Triangle'), 'triangulo', -140, 560, 'sub'),
       n('kim', 'Kimura', 'kimura', 380, 400, 'sub'),
-      n('ml', 'Mata león', 'mata_leon', 300, 800, 'sub'),
+      n('ml', tr('Mata león', 'Rear naked choke'), 'mata_leon', 300, 800, 'sub'),
       n('am', 'Americana', 'americana', 40, 680, 'sub'),
     ],
     tecnicas: [
-      t('pie', 'side', 'Doble pierna', 'derribo', 50, 4),
-      t('pie', 'gc', 'Sentarse en guardia', 'guardia', 90, 3),
-      t('gc', 'mont', 'Barrida de cadera', 'barrida', 40, 3),
-      t('gc', 'arm', 'Armbar desde guardia', 'sumision', 30, 4),
-      t('gc', 'tri', 'Triángulo', 'sumision', 30, 4),
-      t('mg', 'side', 'Pasaje de media', 'pasaje', 50, 3),
-      t('side', 'mont', 'Subir a la montada', 'transicion', 60, 4),
+      t('pie', 'side', tr('Doble pierna', 'Double leg'), 'derribo', 50, 4),
+      t('pie', 'gc', tr('Sentarse en guardia', 'Pull guard'), 'guardia', 90, 3),
+      t('gc', 'mont', tr('Barrida de cadera', 'Hip bump sweep'), 'barrida', 40, 3),
+      t('gc', 'arm', tr('Armbar desde guardia', 'Armbar from guard'), 'sumision', 30, 4),
+      t('gc', 'tri', tr('Triángulo', 'Triangle'), 'sumision', 30, 4),
+      t('mg', 'side', tr('Pasaje de media', 'Half guard pass'), 'pasaje', 50, 3),
+      t('side', 'mont', tr('Subir a la montada', 'Climb to mount'), 'transicion', 60, 4),
       t('side', 'kim', 'Kimura', 'sumision', 40, 3),
-      t('mont', 'esp', 'Tomar la espalda', 'transicion', 50, 4),
+      t('mont', 'esp', tr('Tomar la espalda', 'Take the back'), 'transicion', 50, 4),
       t('mont', 'am', 'Americana', 'sumision', 40, 3),
-      t('esp', 'ml', 'Mata león', 'sumision', 60, 5),
+      t('esp', 'ml', tr('Mata león', 'Rear naked choke'), 'sumision', 60, 5),
     ],
   };
 }
@@ -192,7 +192,7 @@ function curva(t, idx, total) {
 }
 const posL = {}; // dónde quedó cada etiqueta de técnica en el último dibujo
 function dibujar() {
-  $('#titulo').textContent = D.nombre ? `Juego de ${D.nombre}` : 'Mi Juego BJJ';
+  $('#titulo').textContent = D.nombre ? tr(`Juego de ${D.nombre}`, `${D.nombre}'s Game`) : tr('Mi Juego BJJ', 'My BJJ Game');
   $('#defs').innerHTML = `<clipPath id="clipN" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>` +
     Object.entries(TIPOS).map(([k, v]) => `<marker id="m_${k}" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="${v.c}"/></marker>`).join('');
   // agrupar técnicas entre el mismo par para separarlas
@@ -245,13 +245,25 @@ svg.addEventListener('pointerdown', e => {
   svg.setPointerCapture(e.pointerId);
   punteros.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (punteros.size === 2) {
+    if (gesto) clearTimeout(gesto.timer);
+    $('#lineaCon').style.display = 'none';
     const [p, q] = [...punteros.values()];
     gesto = { tipo: 'pinch', d0: Math.hypot(p.x - q.x, p.y - q.y), k0: vista.k, v0: { ...vista }, m: { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 } };
     return;
   }
   const gN = e.target.closest('[data-n]'), gT = e.target.closest('[data-t]');
   gesto = { tipo: gN ? 'nodo' : 'pan', id: gN?.dataset.n, tid: gT?.dataset.t, x0: e.clientX, y0: e.clientY, v0: { ...vista }, movio: false };
-  if (gN) { const n = nodo(gN.dataset.n); gesto.nx = n.x; gesto.ny = n.y; }
+  if (gN) {
+    const n = nodo(gN.dataset.n); gesto.nx = n.x; gesto.ny = n.y;
+    // mantener apretado sin mover = modo flecha
+    const g = gesto;
+    g.timer = setTimeout(() => {
+      if (gesto !== g || g.movio) return;
+      g.tipo = 'conectar'; navigator.vibrate?.(30);
+      const l = $('#lineaCon'); l.setAttribute('x1', n.x); l.setAttribute('y1', n.y); l.setAttribute('x2', n.x); l.setAttribute('y2', n.y); l.style.display = '';
+      toast(tr('Soltá sobre otra posición', 'Release over another position'));
+    }, 450);
+  }
   else if (e.target.closest('[data-l]') && posL[gesto.tid]) { gesto.tipo = 'etiqueta'; gesto.l0 = { ...posL[gesto.tid] }; }
 });
 svg.addEventListener('pointermove', e => {
@@ -267,8 +279,12 @@ svg.addEventListener('pointermove', e => {
     return aplicarVista();
   }
   const dx = e.clientX - gesto.x0, dy = e.clientY - gesto.y0;
+  if (gesto.tipo === 'conectar') {
+    const w = aMundo(e.clientX, e.clientY), l = $('#lineaCon');
+    l.setAttribute('x2', w.x); l.setAttribute('y2', w.y); gesto.movio = true; return;
+  }
   if (!gesto.movio && Math.hypot(dx, dy) < 7) return;
-  gesto.movio = true;
+  gesto.movio = true; clearTimeout(gesto.timer);
   if (gesto.tipo === 'nodo') { const n = nodo(gesto.id); n.x = Math.round(gesto.nx + dx / vista.k); n.y = Math.round(gesto.ny + dy / vista.k); dibujar(); }
   else if (gesto.tipo === 'etiqueta') moverEtiqueta(gesto.tid, gesto.l0.x + dx / vista.k, gesto.l0.y + dy / vista.k);
   else if (gesto.tipo === 'pan') { vista.x = gesto.v0.x + dx; vista.y = gesto.v0.y + dy; aplicarVista(); }
@@ -287,7 +303,15 @@ function moverEtiqueta(id, x, y) {
 function soltar(e) {
   punteros.delete(e.pointerId);
   if (!gesto) return;
+  clearTimeout(gesto.timer);
   if (gesto.tipo === 'pinch') { if (punteros.size === 0) gesto = null; return; }
+  if (gesto.tipo === 'conectar') {
+    $('#lineaCon').style.display = 'none';
+    const destino = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-n]')?.dataset.n;
+    const de = gesto.id, movio = gesto.movio; gesto = null;
+    if (!destino) return;
+    return editarTecnica(null, de, destino === de && !movio ? '' : destino);
+  }
   if (gesto.movio) { if (gesto.tipo === 'nodo' || gesto.tipo === 'etiqueta') guardar(); }
   else if (gesto.tipo === 'nodo') verNodo(gesto.id);
   else if (gesto.tid) verTecnica(gesto.tid);
@@ -312,7 +336,7 @@ function filaTec(t, haciaDestino) {
   const otro = nodo(haciaDestino ? t.a : t.de), tp = TIPOS[t.tipo] || TIPOS.transicion;
   return `<div class="tec" data-vt="${t.id}"><div class="bar" style="background:${tp.c}"></div>
     <div class="info"><div class="nom">${esc(t.nombre)}</div>
-    <div class="sub">${tp.n} · ${haciaDestino ? '→' : '←'} ${esc(otro?.nombre)}</div></div>
+    <div class="sub">${tipoN(tp)} · ${haciaDestino ? '→' : '←'} ${esc(otro?.nombre)}</div></div>
     <div style="text-align:right"><div style="font-weight:600">${t.prob ?? 50}%</div><div class="estrellas" style="font-size:12px">${estrellas(t.gusto || 0)}</div></div></div>`;
 }
 const ordenTec = (a, b) => (b.gusto - a.gusto) || (b.prob - a.prob);
@@ -321,14 +345,29 @@ function verNodo(id) {
   const n = nodo(id); if (!n) return;
   sel = { n: id }; dibujar();
   const sale = D.tecnicas.filter(t => t.de === id).sort(ordenTec), entra = D.tecnicas.filter(t => t.a === id && t.de !== id);
-  abrirHoja(`<div class="cab"><div class="ico">${icoHTML(n.icono)}</div><h2>${esc(n.nombre)}</h2><button id="hEdit">✏️</button></div>
+  const subs = n.tipo === 'sub' ? [] : D.nodos.filter(x => x.tipo === 'sub').sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const pegaTec = portapapeles?.tipo === 'tec' && n.tipo !== 'sub';
+  abrirHoja(`<div class="cab"><div class="ico">${icoHTML(n.icono)}</div><h2>${esc(n.nombre)}</h2><button id="hCopiar" title="${tr('Copiar', 'Copy')}">📋</button><button id="hEdit">✏️</button></div>
     ${n.notas ? `<div class="notas">${esc(n.notas)}</div>` : ''}
-    <div class="seccion">Desde acá aplico (${sale.length})</div>
-    ${sale.map(t => filaTec(t, true)).join('') || '<div class="sub" style="color:var(--dim)">Todavía nada. Agregá una técnica.</div>'}
-    <button class="pri" id="hAdd" style="width:100%;margin-top:6px">＋ Técnica desde ${esc(n.nombre)}</button>
-    ${entra.length ? `<div class="seccion">Llego acá desde</div>${entra.map(t => filaTec(t, false)).join('')}` : ''}`);
+    <div class="seccion">${tr('Desde acá aplico', 'From here I go to')} (${sale.length})</div>
+    ${sale.map(t => filaTec(t, true)).join('') || `<div class="sub" style="color:var(--dim)">${tr('Todavía nada. Agregá una técnica.', 'Nothing yet. Add a technique.')}</div>`}
+    <button class="pri" id="hAdd" style="width:100%;margin-top:6px">＋ ${tr('Técnica desde', 'Technique from')} ${esc(n.nombre)}</button>
+    ${pegaTec ? `<button id="hPegaTec" style="width:100%;margin-top:6px">📋 ${tr('Pegar técnica', 'Paste technique')}: ${esc(portapapeles.t.nombre)}</button>` : ''}
+    ${subs.length ? `<div class="seccion">⚡ ${tr('Sumisiones rápidas (tocá para conectar / desconectar)', 'Quick submissions (tap to connect / disconnect)')}</div>
+      <div class="chips" id="hSubs">${subs.map(x => `<button data-s="${x.id}" class="${sale.some(t => t.a === x.id && t.tipo === 'sumision') ? 'hecho' : ''}">${esc(x.nombre)}</button>`).join('')}</div>` : ''}
+    ${entra.length ? `<div class="seccion">${tr('Llego acá desde', 'I get here from')}</div>${entra.map(t => filaTec(t, false)).join('')}` : ''}
+    <div class="sub" style="color:var(--dim);font-size:12.5px;margin-top:14px">${tr('Tip: mantené apretada una posición y arrastrá hasta otra para crear una flecha.', 'Tip: press and hold a position, then drag to another one to draw an arrow.')}</div>`);
   $('#hEdit').onclick = () => editarNodo(id);
+  $('#hCopiar').onclick = () => copiarNodo(id);
   $('#hAdd').onclick = () => editarTecnica(null, id);
+  $('#hPegaTec') && ($('#hPegaTec').onclick = () => pegarTecnica(id));
+  $('#hSubs') && ($('#hSubs').onclick = e => {
+    const s = e.target.dataset.s; if (!s) return;
+    const hay = D.tecnicas.find(t => t.de === id && t.a === s && t.tipo === 'sumision');
+    if (hay) { if (!confirm(tr(`¿Quitar "${hay.nombre}"?`, `Remove "${hay.nombre}"?`))) return; D.tecnicas = D.tecnicas.filter(t => t !== hay); }
+    else D.tecnicas.push(tecRapida(id, s));
+    guardar(); verNodo(id);
+  });
   hoja.querySelectorAll('[data-vt]').forEach(el => el.onclick = () => editarTecnica(el.dataset.vt));
 }
 function verTecnica(id) { editarTecnica(id); }
@@ -336,13 +375,13 @@ function verTecnica(id) { editarTecnica(id); }
 // ---- Selector de ícono ----
 function selectorIcono(actual, onPick) {
   const ops = [
-    ...Object.entries(ICONOS).filter(([, v]) => v.cat === 'pos').map(([k, v]) => ({ v: k, h: iconoSVG(k, 44), n: v.n })),
-    ...Object.entries(ICONOS).filter(([, v]) => v.cat === 'sub').map(([k, v]) => ({ v: k, h: iconoSVG(k, 44), n: v.n })),
+    ...Object.entries(ICONOS).filter(([, v]) => v.cat === 'pos').map(([k, v]) => ({ v: k, h: iconoSVG(k, 44), n: icoN(v) })),
+    ...Object.entries(ICONOS).filter(([, v]) => v.cat === 'sub').map(([k, v]) => ({ v: k, h: iconoSVG(k, 44), n: icoN(v) })),
     ...EMOJIS.map(e => ({ v: 'emoji:' + e, h: `<span class="em">${e}</span>`, n: '' })),
   ];
-  if (actual && actual.startsWith('img:')) ops.unshift({ v: actual, h: `<img src="${actual.slice(4)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`, n: 'Tu foto' });
+  if (actual && actual.startsWith('img:')) ops.unshift({ v: actual, h: `<img src="${actual.slice(4)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`, n: tr('Tu foto', 'Your photo') });
   return `<div class="grilla" id="grilla">${ops.map(o => `<div class="op ${o.v === actual ? 'sel' : ''}" data-ic="${esc(o.v)}">${o.h}<span>${esc(o.n)}</span></div>`).join('')}</div>
-    <button id="bFoto" style="margin-top:8px">📷 Usar foto / imagen propia</button>`;
+    <button id="bFoto" style="margin-top:8px">📷 ${tr('Usar foto / imagen propia', 'Use my own photo / image')}</button>`;
 }
 function conectarSelector(onPick) {
   const g = $('#grilla');
@@ -358,7 +397,7 @@ function conectarSelector(onPick) {
         c.getContext('2d').drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, s, s);
         const url = 'img:' + c.toDataURL('image/jpeg', .8);
         g.querySelectorAll('.op').forEach(o => o.classList.remove('sel'));
-        g.insertAdjacentHTML('afterbegin', `<div class="op sel" data-ic="${url}"><img src="${url.slice(4)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover"><span>Tu foto</span></div>`);
+        g.insertAdjacentHTML('afterbegin', `<div class="op sel" data-ic="${url}"><img src="${url.slice(4)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover"><span>${tr('Tu foto', 'Your photo')}</span></div>`);
         onPick(url); URL.revokeObjectURL(img.src);
       };
       img.src = URL.createObjectURL(f);
@@ -369,8 +408,10 @@ function conectarSelector(onPick) {
 function iconoPorNombre(nombre) {
   const s = nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   for (const [k, v] of Object.entries(ICONOS)) {
-    const n = v.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    if (s.includes(n) || n.includes(s)) return k;
+    for (const nom of [v.n, v.e].filter(Boolean)) {
+      const n = nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      if (s.includes(n) || n.includes(s)) return k;
+    }
   }
   return null;
 }
@@ -380,12 +421,12 @@ function editarNodo(id, opts = {}) {
   const n = id ? nodo(id) : { id: uid(), nombre: '', icono: null, tipo: 'pos', notas: '', ...opts };
   let icono = n.icono, tipo = n.tipo || 'pos';
   sel = id ? { n: id } : null; dibujar();
-  abrirHoja(`<div class="cab"><h2>${id ? 'Editar posición' : 'Nueva posición'}</h2></div>
-    <label>Nombre</label><input id="fNom" value="${esc(n.nombre)}" placeholder="Ej: Guardia araña">
-    <label>Tipo</label><div class="seg" id="fTipo"><button data-v="pos">Posición</button><button data-v="sub">Sumisión / final</button></div>
-    <label>Ícono</label>${selectorIcono(icono)}
-    <label>Notas</label><textarea id="fNotas" placeholder="Detalles, agarres, qué me funciona…">${esc(n.notas)}</textarea>
-    <div class="fila fin">${id ? '<button class="peligro" id="fBorrar" style="margin-right:auto">Eliminar</button>' : ''}<button id="fCanc">Cancelar</button><button class="pri" id="fOk">Guardar</button></div>`);
+  abrirHoja(`<div class="cab"><h2>${id ? tr('Editar posición', 'Edit position') : tr('Nueva posición', 'New position')}</h2></div>
+    <label>${tr('Nombre', 'Name')}</label><input id="fNom" value="${esc(n.nombre)}" placeholder="${tr('Ej: Guardia araña', 'E.g. Spider guard')}">
+    <label>${tr('Tipo', 'Type')}</label><div class="seg" id="fTipo"><button data-v="pos">${tr('Posición', 'Position')}</button><button data-v="sub">${tr('Sumisión / final', 'Submission / finish')}</button></div>
+    <label>${tr('Ícono', 'Icon')}</label>${selectorIcono(icono)}
+    <label>${tr('Notas', 'Notes')}</label><textarea id="fNotas" placeholder="${tr('Detalles, agarres, qué me funciona…', 'Details, grips, what works for me…')}">${esc(n.notas)}</textarea>
+    <div class="fila fin">${id ? `<button class="peligro" id="fBorrar" style="margin-right:auto">${tr('Eliminar', 'Delete')}</button>` : ''}<button id="fCanc">${tr('Cancelar', 'Cancel')}</button><button class="pri" id="fOk">${tr('Guardar', 'Save')}</button></div>`);
   const pintarTipo = () => $('#fTipo').querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === tipo));
   pintarTipo();
   $('#fTipo').onclick = e => { if (e.target.dataset.v) { tipo = e.target.dataset.v; pintarTipo(); } };
@@ -393,7 +434,7 @@ function editarNodo(id, opts = {}) {
   $('#fNom').oninput = () => { if (!icono) { const k = iconoPorNombre($('#fNom').value); if (k) { tipo = ICONOS[k].cat; pintarTipo(); } } };
   $('#fCanc').onclick = () => id ? verNodo(id) : cerrarHoja();
   $('#fOk').onclick = () => {
-    const nombre = $('#fNom').value.trim(); if (!nombre) return toast('Poné un nombre');
+    const nombre = $('#fNom').value.trim(); if (!nombre) return toast(tr('Poné un nombre', 'Enter a name'));
     if (!icono) icono = iconoPorNombre(nombre) || 'emoji:🥋';
     Object.assign(n, { nombre, icono, tipo, notas: $('#fNotas').value.trim() });
     if (!id) {
@@ -404,7 +445,7 @@ function editarNodo(id, opts = {}) {
   };
   $('#fBorrar') && ($('#fBorrar').onclick = () => {
     const k = D.tecnicas.filter(t => t.de === id || t.a === id).length;
-    if (!confirm(`¿Eliminar "${n.nombre}"${k ? ` y sus ${k} técnicas` : ''}?`)) return;
+    if (!confirm(tr(`¿Eliminar "${n.nombre}"${k ? ` y sus ${k} técnicas` : ''}?`, `Delete "${n.nombre}"${k ? ` and its ${k} techniques` : ''}?`))) return;
     D.nodos = D.nodos.filter(x => x.id !== id); D.tecnicas = D.tecnicas.filter(t => t.de !== id && t.a !== id);
     guardar(); cerrarHoja();
   });
@@ -412,39 +453,55 @@ function editarNodo(id, opts = {}) {
 }
 
 // ---- Editar técnica ----
-function editarTecnica(id, desde) {
-  const t = id ? D.tecnicas.find(x => x.id === id) : { id: uid(), de: desde, a: '', nombre: '', tipo: nodo(desde)?.nombre === 'De pie' ? 'derribo' : 'transicion', prob: 50, gusto: 3, notas: '' };
+function editarTecnica(id, desde, destino) {
+  const t = id ? D.tecnicas.find(x => x.id === id) : { id: uid(), de: desde, a: destino || '', nombre: '', tipo: nodo(desde)?.icono === 'de_pie' ? 'derribo' : 'transicion', prob: 50, gusto: 3, notas: '' };
   if (!t) return;
   let gusto = t.gusto, tipo = t.tipo;
   sel = id ? { t: id } : { n: t.de }; dibujar();
   const origen = nodo(t.de);
   const opciones = D.nodos.filter(n => true).sort((a, b) => a.nombre.localeCompare(b.nombre))
     .map(n => `<option value="${n.id}" ${n.id === t.a ? 'selected' : ''}>${esc(n.nombre)}${n.tipo === 'sub' ? ' (final)' : ''}</option>`).join('');
-  abrirHoja(`<div class="cab"><h2>${id ? 'Técnica' : 'Nueva técnica'}</h2><span style="color:var(--dim);font-size:13px">desde ${esc(origen?.nombre)}</span></div>
-    <label>Nombre de la técnica</label><input id="tNom" value="${esc(t.nombre)}" placeholder="Ej: Doble pierna, Toreando, Tijera…">
-    <label>Tipo</label><select id="tTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === tipo ? 'selected' : ''}>${v.n}</option>`).join('')}</select>
-    <label>¿A dónde caigo?</label>
-    <select id="tA"><option value="">— Elegí —</option>${opciones}<option value="__nuevo">➕ Nueva posición / sumisión…</option></select>
-    <div id="tNuevo" style="display:none"><input id="tNuevoNom" placeholder="Nombre de la nueva posición" style="margin-top:6px"></div>
-    <label>Factibilidad: <b id="tProbV">${t.prob}%</b> <span style="font-size:12px">(qué tan seguido me sale)</span></label>
+  const nombresUsados = [...new Set(D.tecnicas.map(x => x.nombre))].sort();
+  abrirHoja(`<div class="cab"><h2>${id ? tr('Técnica', 'Technique') : tr('Nueva técnica', 'New technique')}</h2><span style="color:var(--dim);font-size:13px">${tr('desde', 'from')} ${esc(origen?.nombre)}</span>${id ? `<button id="tCopiar" title="${tr('Copiar', 'Copy')}">📋</button>` : ''}</div>
+    <label>${tr('Nombre de la técnica', 'Technique name')}</label><input id="tNom" list="tNoms" value="${esc(t.nombre)}" placeholder="${tr('Ej: Doble pierna, Toreando, Tijera…', 'E.g. Double leg, Toreando, Scissor sweep…')}">
+    <datalist id="tNoms">${nombresUsados.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
+    <label>${tr('Tipo', 'Type')}</label><select id="tTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === tipo ? 'selected' : ''}>${tipoN(v)}</option>`).join('')}</select>
+    <label>${tr('¿A dónde caigo?', 'Where do I end up?')}</label>
+    <select id="tA"><option value="">— ${tr('Elegí', 'Choose')} —</option>${opciones}<option value="__nuevo">➕ ${tr('Nueva posición / sumisión…', 'New position / submission…')}</option></select>
+    <div id="tNuevo" style="display:none"><input id="tNuevoNom" placeholder="${tr('Nombre de la nueva posición', 'Name of the new position')}" style="margin-top:6px"></div>
+    <label>${tr('Factibilidad', 'Success rate')}: <b id="tProbV">${t.prob}%</b> <span style="font-size:12px">(${tr('qué tan seguido me sale', 'how often it works for me')})</span></label>
     <input type="range" id="tProb" min="0" max="100" step="5" value="${t.prob}">
-    <label>Cuánto me gusta</label><div class="stars" id="tGusto">${[1,2,3,4,5].map(i => `<button data-v="${i}">★</button>`).join('')}</div>
-    <label>Notas</label><textarea id="tNotas" placeholder="Detalles, setups, errores comunes…">${esc(t.notas)}</textarea>
-    ${t.lu != null ? '<div class="fila"><button id="tEnderezar">↺ Volver la flecha a su lugar</button></div>' : ''}
-    <div class="fila fin">${id ? '<button class="peligro" id="tBorrar" style="margin-right:auto">Eliminar</button>' : ''}<button id="tCanc">Cancelar</button><button class="pri" id="tOk">Guardar</button></div>`);
+    <label>${tr('Cuánto me gusta', 'How much I like it')}</label><div class="stars" id="tGusto">${[1,2,3,4,5].map(i => `<button data-v="${i}">★</button>`).join('')}</div>
+    <label>${tr('Notas', 'Notes')}</label><textarea id="tNotas" placeholder="${tr('Detalles, setups, errores comunes…', 'Details, setups, common mistakes…')}">${esc(t.notas)}</textarea>
+    ${t.lu != null ? `<div class="fila"><button id="tEnderezar">↺ ${tr('Volver la flecha a su lugar', 'Reset arrow position')}</button></div>` : ''}
+    <div class="fila fin">${id ? `<button class="peligro" id="tBorrar" style="margin-right:auto">${tr('Eliminar', 'Delete')}</button>` : ''}<button id="tCanc">${tr('Cancelar', 'Cancel')}</button><button class="pri" id="tOk">${tr('Guardar', 'Save')}</button></div>`);
   const pintarG = () => $('#tGusto').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v <= gusto));
   pintarG();
   $('#tGusto').onclick = e => { if (e.target.dataset.v) { gusto = +e.target.dataset.v; pintarG(); } };
   $('#tProb').oninput = () => $('#tProbV').textContent = $('#tProb').value + '%';
-  $('#tA').onchange = () => { $('#tNuevo').style.display = $('#tA').value === '__nuevo' ? '' : 'none'; if ($('#tA').value === '__nuevo') $('#tNuevoNom').focus(); };
+  // destino = sumisión → tipo y nombre sugeridos
+  const sugerir = () => {
+    const d = nodo($('#tA').value); if (!d || d.tipo !== 'sub') return;
+    $('#tTipo').value = 'sumision';
+    if (!$('#tNom').value.trim()) $('#tNom').value = d.nombre;
+  };
+  $('#tA').onchange = () => { $('#tNuevo').style.display = $('#tA').value === '__nuevo' ? '' : 'none'; if ($('#tA').value === '__nuevo') $('#tNuevoNom').focus(); sugerir(); };
+  if (!id) sugerir();
+  // elegir un nombre ya usado copia tipo, factibilidad, gusto y notas
+  $('#tNom').onchange = () => {
+    const o = D.tecnicas.find(x => x.nombre === $('#tNom').value.trim() && x.id !== t.id); if (!o) return;
+    $('#tTipo').value = o.tipo; $('#tProb').value = o.prob; $('#tProbV').textContent = o.prob + '%'; gusto = o.gusto; pintarG();
+    if (!$('#tNotas').value.trim()) $('#tNotas').value = o.notas || '';
+  };
+  $('#tCopiar') && ($('#tCopiar').onclick = () => { portapapeles = { tipo: 'tec', t: { ...t } }; botonPegar(); toast(tr('Técnica copiada: pegala desde otra posición', 'Technique copied: paste it from another position')); });
   $('#tCanc').onclick = () => id ? cerrarHoja() : verNodo(t.de);
   $('#tOk').onclick = () => {
-    const nombre = $('#tNom').value.trim(); if (!nombre) return toast('Poné el nombre de la técnica');
+    const nombre = $('#tNom').value.trim(); if (!nombre) return toast(tr('Poné el nombre de la técnica', 'Enter the technique name'));
     let a = $('#tA').value;
     tipo = $('#tTipo').value;
-    if (!a) return toast('Elegí a dónde caés');
+    if (!a) return toast(tr('Elegí a dónde caés', 'Choose where you end up'));
     if (a === '__nuevo') {
-      const nn = $('#tNuevoNom').value.trim(); if (!nn) return toast('Nombre de la nueva posición');
+      const nn = $('#tNuevoNom').value.trim(); if (!nn) return toast(tr('Nombre de la nueva posición', 'Name of the new position'));
       const ic = iconoPorNombre(nn);
       const cant = D.tecnicas.filter(x => x.de === t.de).length;
       const nuevo = { id: uid(), nombre: nn, icono: ic || 'emoji:🥋', tipo: tipo === 'sumision' || (ic && ICONOS[ic].cat === 'sub') ? 'sub' : 'pos', notas: '',
@@ -458,7 +515,7 @@ function editarTecnica(id, desde) {
   };
   $('#tEnderezar') && ($('#tEnderezar').onclick = () => { delete t.lu; delete t.lv; guardar(); editarTecnica(id); });
   $('#tBorrar') && ($('#tBorrar').onclick = () => {
-    if (!confirm(`¿Eliminar "${t.nombre}"?`)) return;
+    if (!confirm(tr(`¿Eliminar "${t.nombre}"?`, `Delete "${t.nombre}"?`))) return;
     D.tecnicas = D.tecnicas.filter(x => x.id !== id); guardar(); cerrarHoja();
   });
 }
@@ -467,13 +524,13 @@ function editarTecnica(id, desde) {
 function verLista() {
   const L = $('#lista');
   const orden = [...D.nodos].sort((a, b) => (a.tipo === 'sub') - (b.tipo === 'sub') || a.y - b.y);
-  L.innerHTML = `<div class="fila" style="margin-bottom:6px"><h2 style="flex:1;margin:0;font-size:20px">${esc($('#titulo').textContent)}</h2><button id="lCerrar">✕ Mapa</button></div>
-    <div class="leyenda">${Object.values(TIPOS).map(v => `<span style="--c:${v.c}">${v.n}</span>`).join('')}</div>
-    <div class="sub" style="color:var(--dim);font-size:12.5px">Grosor de flecha = cuánto me gusta · brillo = factibilidad</div>
+  L.innerHTML = `<div class="fila" style="margin-bottom:6px"><h2 style="flex:1;margin:0;font-size:20px">${esc($('#titulo').textContent)}</h2><button id="lCerrar">✕ ${tr('Mapa', 'Map')}</button></div>
+    <div class="leyenda">${Object.values(TIPOS).map(v => `<span style="--c:${v.c}">${tipoN(v)}</span>`).join('')}</div>
+    <div class="sub" style="color:var(--dim);font-size:12.5px">${tr('Grosor de flecha = cuánto me gusta · brillo = factibilidad', 'Arrow thickness = how much I like it · brightness = success rate')}</div>
     ${orden.map(n => {
       const sale = D.tecnicas.filter(t => t.de === n.id).sort(ordenTec);
       return `<div class="cab" style="margin-top:18px" data-ln="${n.id}"><div class="ico" style="width:44px;height:44px;font-size:24px">${icoHTML(n.icono)}</div><h2 style="font-size:17px">${esc(n.nombre)}</h2></div>
-        ${sale.map(t => filaTec(t, true)).join('') || (n.tipo === 'sub' ? '' : '<div style="color:var(--dim);font-size:13px">Sin técnicas todavía</div>')}`;
+        ${sale.map(t => filaTec(t, true)).join('') || (n.tipo === 'sub' ? '' : `<div style="color:var(--dim);font-size:13px">${tr('Sin técnicas todavía', 'No techniques yet')}</div>`)}`;
     }).join('')}<div style="height:40px"></div>`;
   L.classList.add('abierta');
   $('#lCerrar').onclick = () => L.classList.remove('abierta');
@@ -484,22 +541,22 @@ function verLista() {
 // ---------- TXT ----------
 const MARCA = '----- DATOS (no editar debajo de esta línea) -----';
 function aTexto() {
-  let s = `MI JUEGO BJJ${D.nombre ? ' — ' + D.nombre : ''}\nExportado: ${new Date().toLocaleDateString('es-AR')}\n`;
-  s += `Abrilo en https://gabrieltrabajo909-create.github.io/mapa-bjj/ (Menú → Subir TXT)\n\n`;
+  let s = `${tr('MI JUEGO BJJ', 'MY BJJ GAME')}${D.nombre ? ' — ' + D.nombre : ''}\n${tr('Exportado', 'Exported')}: ${new Date().toLocaleDateString(tr('es-AR', 'en-US'))}\n`;
+  s += `${tr('Abrilo en', 'Open it at')} https://gabrieltrabajo909-create.github.io/mapa-bjj/ (${tr('Menú → Subir TXT', 'Menu → Import TXT')})\n\n`;
   [...D.nodos].sort((a, b) => a.y - b.y).forEach(n => {
     const sale = D.tecnicas.filter(t => t.de === n.id).sort(ordenTec);
-    s += `== ${n.nombre}${n.tipo === 'sub' ? ' (sumisión)' : ''} ==\n`;
+    s += `== ${n.nombre}${n.tipo === 'sub' ? tr(' (sumisión)', ' (submission)') : ''} ==\n`;
     if (n.notas) s += `   ${n.notas.replace(/\n/g, '\n   ')}\n`;
-    sale.forEach(t => s += `  → ${t.nombre} [${(TIPOS[t.tipo] || {}).n}] → ${nodo(t.a)?.nombre} · ${t.prob}% · ${estrellas(t.gusto)}${t.notas ? `\n      ${t.notas.replace(/\n/g, '\n      ')}` : ''}\n`);
+    sale.forEach(t => s += `  → ${t.nombre} [${tipoN(TIPOS[t.tipo] || TIPOS.transicion)}] → ${nodo(t.a)?.nombre} · ${t.prob}% · ${estrellas(t.gusto)}${t.notas ? `\n      ${t.notas.replace(/\n/g, '\n      ')}` : ''}\n`);
     s += '\n';
   });
   return s + MARCA + '\n' + JSON.stringify(D);
 }
 function bajar() {
-  const nom = 'juego-bjj' + (D.nombre ? '-' + D.nombre.toLowerCase().replace(/[^a-z0-9]+/gi, '-') : '') + '.txt';
+  const nom = tr('juego-bjj', 'bjj-game') + (D.nombre ? '-' + D.nombre.toLowerCase().replace(/[^a-z0-9]+/gi, '-') : '') + '.txt';
   const blob = new Blob([aTexto()], { type: 'text/plain;charset=utf-8' }), a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = nom; document.body.appendChild(a); a.click(); a.remove();
-  toast('TXT descargado');
+  toast(tr('TXT descargado', 'TXT downloaded'));
 }
 $('#archivo').onchange = async () => {
   const f = $('#archivo').files[0]; if (!f) return;
@@ -507,15 +564,15 @@ $('#archivo').onchange = async () => {
   try {
     const nuevo = JSON.parse(i >= 0 ? txt.slice(i + MARCA.length) : txt);
     if (!Array.isArray(nuevo.nodos) || !Array.isArray(nuevo.tecnicas)) throw 0;
-    if (!confirm(`Cargar "${nuevo.nombre || 'juego sin nombre'}" (${nuevo.nodos.length} posiciones, ${nuevo.tecnicas.length} técnicas)? Reemplaza el mapa actual — bajá un TXT antes si querés guardarlo.`)) return;
-    D = nuevo; guardar(); sel = null; dibujar(); centrar(); toast('Juego cargado');
-  } catch { alert('Ese archivo no es un TXT de Mi Juego BJJ.'); }
+    if (!confirm(tr(`Cargar "${nuevo.nombre || 'juego sin nombre'}" (${nuevo.nodos.length} posiciones, ${nuevo.tecnicas.length} técnicas)? Reemplaza el mapa actual — bajá un TXT antes si querés guardarlo.`, `Load "${nuevo.nombre || 'unnamed game'}" (${nuevo.nodos.length} positions, ${nuevo.tecnicas.length} techniques)? It replaces the current map — download a TXT first if you want to keep it.`))) return;
+    D = nuevo; guardar(); sel = null; dibujar(); centrar(); toast(tr('Juego cargado', 'Game loaded'));
+  } catch { alert(tr('Ese archivo no es un TXT de Mi Juego BJJ.', 'That file is not a My BJJ Game TXT.')); }
   $('#archivo').value = '';
 };
 
 // ---------- Ordenar automáticamente (por niveles desde "De pie") ----------
 function ordenar() {
-  if (!confirm('¿Reacomodar todas las posiciones automáticamente?')) return;
+  if (!confirm(tr('¿Reacomodar todas las posiciones automáticamente?', 'Rearrange all positions automatically?'))) return;
   const nivel = {}, raices = D.nodos.filter(n => !D.tecnicas.some(t => t.a === n.id && t.de !== n.id));
   const cola = (raices.length ? raices : D.nodos.slice(0, 1)).map(n => (nivel[n.id] = 0, n.id));
   while (cola.length) { const id = cola.shift(); D.tecnicas.filter(t => t.de === id).forEach(t => { if (!(t.a in nivel)) { nivel[t.a] = nivel[id] + 1; cola.push(t.a); } }); }
@@ -536,20 +593,92 @@ document.addEventListener('click', e => { if (!e.target.closest('#menu')) $('#me
 $('#menu').onclick = e => {
   const a = e.target.dataset.a; if (!a) return;
   $('#menu').classList.remove('abierto');
-  if (a === 'nombre') { const v = prompt('¿De quién es este juego?', D.nombre || ''); if (v != null) { D.nombre = v.trim(); guardar(); dibujar(); } }
+  if (a === 'idioma') return cambiarIdioma();
+  if (a === 'nombre') { const v = prompt(tr('¿De quién es este juego?', 'Whose game is this?'), D.nombre || ''); if (v != null) { D.nombre = v.trim(); guardar(); dibujar(); } }
   if (a === 'bajar') bajar();
   if (a === 'subir') $('#archivo').click();
   if (a === 'ordenar') ordenar();
-  if (a === 'ejemplo' && confirm('¿Reemplazar tu mapa por el de ejemplo?')) { const nom = D.nombre; D = ejemplo(); D.nombre = nom; guardar(); cerrarHoja(); centrar(); }
-  if (a === 'borrar' && confirm('¿Borrar todo y empezar de cero? (bajá un TXT antes si querés guardarlo)')) {
-    D = { nombre: D.nombre, nodos: [{ id: uid(), nombre: 'De pie', icono: 'de_pie', tipo: 'pos', notas: '', x: 0, y: 0 }], tecnicas: [] };
+  if (a === 'ejemplo' && confirm(tr('¿Reemplazar tu mapa por el de ejemplo?', 'Replace your map with the example one?'))) { const nom = D.nombre; D = ejemplo(); D.nombre = nom; guardar(); cerrarHoja(); centrar(); }
+  if (a === 'borrar' && confirm(tr('¿Borrar todo y empezar de cero? (bajá un TXT antes si querés guardarlo)', 'Delete everything and start over? (download a TXT first if you want to keep it)'))) {
+    D = { nombre: D.nombre, nodos: [{ id: uid(), nombre: tr('De pie', 'Standing'), icono: 'de_pie', tipo: 'pos', notas: '', x: 0, y: 0 }], tecnicas: [] };
     guardar(); cerrarHoja(); centrar();
   }
 };
 let anchoPrev = innerWidth;
 addEventListener('resize', () => { if (innerWidth !== anchoPrev) { anchoPrev = innerWidth; centrar(); } });
 
-cargar(); dibujar(); centrar();
+// ---------- Copiar / pegar ----------
+let portapapeles = null;
+try { portapapeles = JSON.parse(localStorage.getItem('mapa-bjj-clip')); } catch {}
+function botonPegar() {
+  try { localStorage.setItem('mapa-bjj-clip', JSON.stringify(portapapeles)); } catch {}
+  const b = $('#bPegar');
+  b.style.display = portapapeles?.tipo === 'nodo' ? '' : 'none';
+  b.textContent = '📋 ' + tr('Pegar', 'Paste');
+}
+function copiarNodo(id) {
+  const n = nodo(id);
+  portapapeles = { tipo: 'nodo', n: { ...n }, sale: D.tecnicas.filter(t => t.de === id).map(t => ({ ...t })) };
+  botonPegar(); toast(tr(`"${n.nombre}" copiada · tocá 📋 Pegar arriba`, `"${n.nombre}" copied · tap 📋 Paste at the top`));
+}
+function pegarNodo() {
+  if (portapapeles?.tipo !== 'nodo') return;
+  const c = aMundo(innerWidth / 2, innerHeight / 2.4);
+  const n = { ...portapapeles.n, id: uid(), x: Math.round(c.x), y: Math.round(c.y) };
+  D.nodos.push(n);
+  // también copio sus flechas de salida (a las posiciones que existan en este mapa)
+  portapapeles.sale.forEach(t => { if (nodo(t.a) || t.a === portapapeles.n.id) D.tecnicas.push({ ...t, id: uid(), de: n.id, a: t.a === portapapeles.n.id ? n.id : t.a }); });
+  guardar(); verNodo(n.id); toast(tr('Pegada · podés editarla con ✏️', 'Pasted · edit it with ✏️'));
+}
+function pegarTecnica(de) {
+  const o = portapapeles.t;
+  if (!nodo(o.a)) return toast(tr('El destino de esa técnica ya no existe', "That technique's destination no longer exists"));
+  const t = { ...o, id: uid(), de }; delete t.lu; delete t.lv;
+  D.tecnicas.push(t); guardar(); verNodo(de); toast(tr('Técnica pegada', 'Technique pasted'));
+}
+// técnica de un toque: posición → sumisión, copiando datos de otra con el mismo destino si existe
+function tecRapida(de, a) {
+  const o = D.tecnicas.find(t => t.a === a && t.tipo === 'sumision');
+  return { id: uid(), de, a, nombre: nodo(a).nombre, tipo: 'sumision', prob: o?.prob ?? 50, gusto: o?.gusto ?? 3, notas: '' };
+}
+$('#bPegar').onclick = pegarNodo;
+
+// ---------- Idioma ----------
+// pares de nombres conocidos para traducir posiciones/técnicas del mapa al cambiar de idioma
+const PARES = [...Object.values(ICONOS).filter(v => v.e).map(v => [v.n, v.e]), ...Object.values(TIPOS).map(v => [v.n, v.e]),
+  ['Mata león', 'Rear naked choke'], ['Espalda', 'Back control'], ['Triángulo', 'Triangle'], ['Mariposa', 'Butterfly guard'], ['Doble pierna', 'Double leg'], ['Simple pierna', 'Single leg'],
+  ['Sentarse en guardia', 'Pull guard'], ['Barrida de cadera', 'Hip bump sweep'], ['Armbar desde guardia', 'Armbar from guard'], ['Pasaje de media', 'Half guard pass'],
+  ['Subir a la montada', 'Climb to mount'], ['Tomar la espalda', 'Take the back'], ['Barrida tijera', 'Scissor sweep'], ['Estrangulación', 'Choke']];
+function aplicarIdioma() {
+  document.documentElement.lang = LANG;
+  document.title = tr('Mi Juego BJJ', 'My BJJ Game');
+  $('#bCentrar').title = tr('Centrar', 'Center'); $('#bNuevo').title = tr('Nueva posición', 'New position'); $('#bMenu').title = tr('Menú', 'Menu');
+  $('#bLista').textContent = '☰ ' + tr('Lista', 'List');
+  $('#menu').innerHTML = `<button data-a="nombre">✏️ ${tr('Nombre del jugador', 'Player name')}</button>
+    <button data-a="bajar">⬇️ ${tr('Bajar TXT', 'Download TXT')}</button>
+    <button data-a="subir">⬆️ ${tr('Subir TXT', 'Import TXT')}</button>
+    <button data-a="idioma">🌐 ${tr('English', 'Español')}</button>
+    <hr>
+    <button data-a="ordenar">🧭 ${tr('Ordenar mapa', 'Auto-arrange map')}</button>
+    <button data-a="ejemplo">📋 ${tr('Cargar mapa de ejemplo', 'Load example map')}</button>
+    <button data-a="borrar" class="peligro">🗑️ ${tr('Empezar de cero', 'Start over')}</button>`;
+  $('#ayuda').textContent = tr('Tocá una posición · mantené y arrastrá hasta otra para crear flecha · pellizcá para zoom', 'Tap a position · hold and drag to another to draw an arrow · pinch to zoom');
+  botonPegar();
+}
+function cambiarIdioma() {
+  const de = LANG === 'en' ? 1 : 0, a = 1 - de;
+  LANG = LANG === 'en' ? 'es' : 'en';
+  try { localStorage.setItem('mapa-bjj-lang', LANG); } catch {}
+  const mapa = new Map(PARES.map(p => [p[de].toLowerCase(), p[a]]));
+  let k = 0;
+  [...D.nodos, ...D.tecnicas].forEach(x => { const v = mapa.get(x.nombre.toLowerCase()); if (v) { x.nombre = v; k++; } });
+  if (k) guardar();
+  aplicarIdioma(); cerrarHoja();
+  toast(k ? tr(`Español · ${k} nombres traducidos`, `English · ${k} names translated`) : tr('Español', 'English'));
+}
+
+cargar(); aplicarIdioma(); dibujar(); centrar();
+if (primeraVez) cambiarIdioma(); // ahora la app arranca en inglés (traduce los nombres conocidos una vez)
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
 </body>
